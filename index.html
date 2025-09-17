@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Калькулятор распила металла</title>
+  <style>
+    body { 
+      font-family: sans-serif; 
+      margin: 20px; 
+      background: #f8f9fa; 
+    }
+    h1 { margin-bottom: 10px; }
+    input, button, select {
+      margin: 5px; 
+      padding: 10px; 
+      font-size: 16px;
+    }
+    button { cursor: pointer; }
+    table { 
+      border-collapse: collapse; 
+      margin-top: 10px; 
+      width: 100%;
+      font-size: 18px;
+    }
+    table, th, td { border: 1px solid #ccc; padding: 10px; text-align: center; }
+    th { background: #eee; }
+    .result { margin-top: 20px; }
+    .done { text-decoration: line-through; color: gray; }
+    .stock-bar {
+      display: flex; 
+      height: 30px; 
+      margin: 5px 0; 
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      overflow: hidden;
+    }
+    .piece { background: steelblue; color: white; text-align: center; font-size: 12px; line-height: 30px; }
+    .piece.done { background: seagreen !important; }
+    .rest { background: crimson; color: white; text-align: center; font-size: 12px; line-height: 30px; }
+    @media (max-width: 600px) {
+      body { margin: 10px; }
+      input, button, select { width: 100%; margin: 5px 0; font-size: 18px; }
+      table { font-size: 16px; }
+    }
+  </style>
+</head>
+<body>
+  <h1>Калькулятор распила металла</h1>
+
+  <label>Длина заготовки: 
+    <input type="number" id="stockLength" value="5800">
+  </label>
+  <br>
+
+  <h3>Добавить отрезки</h3>
+  <input type="number" id="pieceLength" placeholder="Длина (мм)">
+  <input type="number" id="pieceCount" placeholder="Кол-во">
+  <button onclick="addPiece()">Добавить</button>
+  <button onclick="clearAll()">Очистить всё</button>
+
+  <table id="piecesTable">
+    <tr><th>Длина</th><th>Кол-во</th><th>Удалить</th></tr>
+  </table>
+
+  <label>Алгоритм: 
+    <select id="algoSelect">
+      <option value="greedy">Жадный</option>
+      <option value="optimal">Оптимальный</option>
+    </select>
+  </label>
+  <br>
+  <button onclick="calculate()">Рассчитать</button>
+
+  <div class="result" id="result"></div>
+
+  <script>
+    let pieces = [];
+
+    function addPiece() {
+      const length = parseInt(document.getElementById('pieceLength').value);
+      const count = parseInt(document.getElementById('pieceCount').value);
+      if (!length || !count) return;
+
+      pieces.push({ length, count });
+      renderTable();
+    }
+
+    function removePiece(index) {
+      pieces.splice(index, 1);
+      renderTable();
+    }
+
+    function clearAll() {
+      pieces = [];
+      document.getElementById('result').innerHTML = "";
+      renderTable();
+    }
+
+    function renderTable() {
+      const table = document.getElementById('piecesTable');
+      table.innerHTML = '<tr><th>Длина</th><th>Кол-во</th><th>Удалить</th></tr>';
+      pieces.forEach((p, i) => {
+        table.innerHTML += `
+          <tr>
+            <td>${p.length}</td>
+            <td>${p.count}</td>
+            <td><button onclick="removePiece(${i})">Удалить</button></td>
+          </tr>`;
+      });
+    }
+
+    // Жадный алгоритм
+    function greedy(stockLength, allPieces) {
+      let result = [];
+      allPieces.sort((a, b) => b - a);
+
+      while (allPieces.length > 0) {
+        let sum = 0;
+        let cuts = [];
+        for (let i = 0; i < allPieces.length; ) {
+          if (sum + allPieces[i] <= stockLength) {
+            sum += allPieces[i];
+            cuts.push(allPieces[i]);
+            allPieces.splice(i, 1);
+          } else {
+            i++;
+          }
+        }
+        result.push({ cuts, rest: stockLength - sum });
+      }
+      return result;
+    }
+
+    // Оптимальный алгоритм
+    function optimal(stockLength, allPieces) {
+      function pack(items) {
+        let dp = Array(stockLength + 1).fill(null);
+        dp[0] = [];
+        for (let i = 0; i < items.length; i++) {
+          for (let w = stockLength; w >= items[i]; w--) {
+            if (dp[w - items[i]] !== null && dp[w] === null) {
+              dp[w] = [...dp[w - items[i]], i];
+            }
+          }
+        }
+        for (let w = stockLength; w >= 0; w--) {
+          if (dp[w] !== null) return dp[w];
+        }
+        return [];
+      }
+
+      let result = [];
+      while (allPieces.length > 0) {
+        let indices = pack(allPieces);
+        if (indices.length === 0) break;
+
+        let chosen = indices.map(i => allPieces[i]);
+        let sum = chosen.reduce((a, b) => a + b, 0);
+        result.push({ cuts: chosen, rest: stockLength - sum });
+        indices.sort((a, b) => b - a).forEach(i => allPieces.splice(i, 1));
+      }
+      return result;
+    }
+
+    function calculate() {
+      const stockLength = parseInt(document.getElementById('stockLength').value);
+      if (!stockLength || pieces.length === 0) return;
+
+      let allPieces = [];
+      pieces.forEach(p => {
+        for (let i = 0; i < p.count; i++) {
+          allPieces.push(p.length);
+        }
+      });
+
+      let algo = document.getElementById('algoSelect').value;
+      let result = (algo === "greedy") ? greedy(stockLength, allPieces) : optimal(stockLength, allPieces);
+
+      renderResult(result, stockLength);
+    }
+
+    function renderResult(result, stockLength) {
+      const container = document.getElementById('result');
+      container.innerHTML = '<h3>Результат</h3>';
+      result.forEach((r, idx) => {
+        let cutsHtml = r.cuts.map((c, i) => 
+          `<label><input type="checkbox" onchange="toggleDone(this, ${idx}, ${i})"> <span>${c}</span></label>`
+        ).join(' + ');
+
+        let bar = `<div class="stock-bar" data-stock="${idx}">`;
+        r.cuts.forEach((c, i) => {
+          let w = (c / stockLength * 100).toFixed(2);
+          bar += `<div class="piece" data-piece="${i}" style="width:${w}%">${c}</div>`;
+        });
+        if (r.rest > 0) {
+          let w = (r.rest / stockLength * 100).toFixed(2);
+          bar += `<div class="rest" style="width:${w}%">${r.rest}</div>`;
+        }
+        bar += `</div>`;
+
+        container.innerHTML += `
+          <div>
+            <label><input type="checkbox" onchange="toggleStockDone(this, ${idx})"> <b>Заготовка ${idx+1}:</b></label>
+            ${cutsHtml} 
+            <i>(остаток: ${r.rest})</i>
+            ${bar}
+          </div>`;
+      });
+
+      let totalRest = result.reduce((a, b) => a + b.rest, 0);
+      container.innerHTML += `<p><b>Всего заготовок:</b> ${result.length}, <b>суммарный остаток:</b> ${totalRest}</p>`;
+    }
+
+    function toggleDone(checkbox, stockIdx, pieceIdx) {
+      const span = checkbox.nextElementSibling;
+      if (checkbox.checked) span.classList.add('done');
+      else span.classList.remove('done');
+
+      const bar = document.querySelector(`.stock-bar[data-stock="${stockIdx}"]`);
+      if (!bar) return;
+      const piece = bar.querySelector(`.piece[data-piece="${pieceIdx}"]`);
+      if (!piece) return;
+      if (checkbox.checked) piece.classList.add("done");
+      else piece.classList.remove("done");
+    }
+
+    function toggleStockDone(checkbox, stockIdx) {
+      const container = checkbox.closest("div");
+      if (!container) return;
+      const spans = container.querySelectorAll("span");
+      const checks = container.querySelectorAll("input[type='checkbox']");
+      spans.forEach(s => {
+        if (checkbox.checked) s.classList.add('done');
+        else s.classList.remove('done');
+      });
+      checks.forEach(cb => { 
+        if (cb !== checkbox) {
+          cb.checked = checkbox.checked;
+          cb.dispatchEvent(new Event("change"));
+        }
+      });
+    }
+  </script>
+</body>
+</html>

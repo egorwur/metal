@@ -186,6 +186,28 @@ document.addEventListener('DOMContentLoaded', ()=> {
     localStorage.setItem('minWaste', minWasteInput.value || '');
   }
 
+// Функция возвращает фон и цвет текста для конкретного размера
+function colorForLength(len, min = 350, max = 2200, step = 50) {
+    const saturation = 65; // насыщенность %
+    const baseLightness = 50; // базовая светлота %
+    const lightnessDelta = 6; // чередуем светлоту для соседних размеров
+
+    const idx = Math.round((len - min) / step);
+    const N = Math.round((max - min) / step) + 1;
+
+    const offset = 20; // смещение оттенка для более приятного старта
+    const hue = (offset + (idx * 360 / N)) % 360;
+    const lightness = baseLightness + ((idx % 2 === 0) ? lightnessDelta : -lightnessDelta);
+
+    const bg = `hsl(${Math.round(hue)} ${saturation}% ${Math.round(lightness)}%)`;
+
+    // Простая эвристика для текста
+    const text = (lightness < 55) ? '#ffffff' : '#222222';
+
+    return { bg, text };
+}
+
+
   function updateCutsList() {
     const container = document.getElementById('cuts-container');
     container.innerHTML = '';
@@ -531,21 +553,18 @@ document.addEventListener('DOMContentLoaded', ()=> {
       const piecesContainer = document.createElement('div');
       piecesContainer.className = 'cut-pieces';
       // add piece elements with colors based on length
-      stock.pieces.forEach(len => {
-        const pieceDiv = document.createElement('div');
-        pieceDiv.className = 'cut-piece';
-        pieceDiv.textContent = `${len} мм`;
-        // use deterministic color
-        pieceDiv.style.background = getColorForLength(len);
-        // if this stock is globally marked completed, mark piece green
-        if (completedStocks.includes(idx)) pieceDiv.classList.add('done');
-        // allow clicking on piece to toggle its individual done state
-        pieceDiv.style.cursor = 'pointer';
-        pieceDiv.addEventListener('click', () => {
-          pieceDiv.classList.toggle('done');
-        });
-        piecesContainer.appendChild(pieceDiv);
-      });
+      stock.pieces.forEach(pieceLen => {
+    const pieceDiv = document.createElement('div');
+    pieceDiv.className = 'cut-piece';
+    pieceDiv.textContent = `${pieceLen} мм`;
+
+    const { bg, text } = colorForLength(pieceLen, 350, 2200, 50);
+    pieceDiv.style.background = bg;
+    pieceDiv.style.color = text;
+
+    piecesContainer.appendChild(pieceDiv);
+});
+;
 
       // add waste as last element (red)
       if (stock.remaining > 0) {

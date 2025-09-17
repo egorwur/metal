@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Калькулятор раскроя металла — с минимальным остатком</title>
+<title>Калькулятор раскроя металла — с цветами по длине</title>
 <style>
   * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
   html, body { margin: 0; padding: 0; background: #f5f5f5; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
@@ -15,9 +15,16 @@
     overflow-x: hidden;
   }
   .container { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start; }
-  .input-section, .result-section { background: #fff; padding: 18px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
+
+  .input-section, .result-section {
+    background: #fff;
+    padding: 18px;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+  }
   .input-section { flex: 1; min-width: 300px; max-width: 420px; }
   .result-section { flex: 2; min-width: 320px; }
+
   h1,h2,h3 { color: #2c3e50; margin: 0 0 12px 0; }
   .form-group { margin-bottom: 12px; }
   label { display:block; margin-bottom:6px; font-weight:600; }
@@ -33,21 +40,49 @@
   .cuts-list { margin-top: 10px; }
   .cut-item { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:8px; background:#f9f9f9; border-radius:6px; margin-bottom:8px; }
   .delete-btn { background:#e74c3c; color:#fff; padding:6px 8px; border-radius:6px; border:none; cursor:pointer; }
-  .result-item { margin-bottom:14px; padding:14px; background:#fafafa; border-radius:8px; position:relative; overflow:hidden; }
+
+  .result-item { margin-bottom:14px; padding:14px; background:#fafafa; border-radius:8px; position:relative; overflow:hidden; border:1px solid rgba(0,0,0,0.04); }
   .result-item .stock-header { margin:0 0 6px 0; font-size:18px; }
   .result-item.completed { background:#e8f5e9; }
-  .result-item.completed .cut-piece { background:#8bc34a; }
+  .result-item.completed .cut-piece { background:#8bc34a !important; color: #fff; }
+
   .cut-pieces { display:flex; flex-wrap:wrap; gap:10px; margin-top:10px; align-items:center; }
-  .cut-piece { background:#3498db; color:#fff; padding:8px 12px; border-radius:6px; min-width:80px; max-width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:0 1 auto; font-size:14px; }
+  .cut-piece {
+    background:#3498db;
+    color:#fff;
+    padding:8px 12px;
+    border-radius:6px;
+    min-width:80px;
+    max-width:100%;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    flex:0 1 auto;
+    font-size:14px;
+    border:1px solid rgba(0,0,0,0.06);
+  }
+  /* при выполнении конкретного куска — делаем override на зелёный */
+  .cut-piece.done { background:#8bc34a !important; color:#fff !important; }
+
   .cut-piece.waste { background:#e74c3c; }
+
   .total-info { margin-top:16px; padding:12px; background:#2c3e50; color:white; border-radius:8px; }
+
   .completed-checkbox { position:absolute; right:12px; top:12px; transform:scale(1.4); }
   .completed-label { position:absolute; right:52px; top:14px; color:#7f8c8d; font-size:13px; }
+
   .progress-wrap { margin-top:8px; }
   .progress-bar { height:10px; background:#ecf0f1; border-radius:999px; overflow:hidden; }
   .progress { height:100%; background:#2ecc71; width:0%; transition:width .4s ease; }
+
   .action-buttons { display:flex; gap:10px; margin-top:12px; }
   .action-buttons button { flex:1; padding:10px; font-weight:700; }
+
+  /* legend */
+  .legend { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; align-items:center; }
+  .legend-item { display:flex; gap:8px; align-items:center; font-size:13px; color:#333; background:#fff; padding:6px 8px; border-radius:6px; border:1px solid rgba(0,0,0,0.04); }
+  .legend-swatch { width:18px; height:14px; border-radius:3px; border:1px solid rgba(0,0,0,0.08); display:inline-block; }
+
   @media (max-width: 880px) {
     body { padding:12px; }
     .container { flex-direction: column; }
@@ -60,16 +95,7 @@
     input[type="number"], select, button { font-size:16px; padding:10px; }
   }
 
-  /* небольшая метка предупреждения */
-  .warn {
-    margin-top:10px;
-    padding:8px;
-    background:#fff3cd;
-    border:1px solid #ffeeba;
-    color:#856404;
-    border-radius:6px;
-  }
-  
+  .warn { margin-top:10px; padding:8px; background:#fff3cd; border:1px solid #ffeeba; color:#856404; border-radius:6px; }
 </style>
 </head>
 <body>
@@ -81,7 +107,7 @@
 
       <div class="form-group">
         <label for="stock-length">Длина заготовки (мм):</label>
-        <input id="stock-length" type="number" value="5800" min="1">
+        <input id="stock-length" type="number" value="5800" min="1" data-numeric type="tel" inputmode="numeric" pattern="\d*" autocomplete="off">
       </div>
 
       <div class="form-group">
@@ -94,18 +120,18 @@
 
       <div class="form-group">
         <label for="min-waste">Мин. допустимый остаток (мм) — остаток не может быть меньше этого значения (оставьте пустым или 0 для без ограничений):</label>
-        <input id="min-waste" type="number" min="0" placeholder="Например: 250">
+        <input id="min-waste"  min="0" placeholder="Например: 250" data-numeric type="tel" inputmode="numeric" pattern="\d*" autocomplete="off">
       </div>
 
       <h3>Добавить отрезки</h3>
       <div class="form-group">
         <label for="cut-length">Длина отрезка (мм):</label>
-        <input id="cut-length" type="number" min="1">
+        <input id="cut-length"  min="1" data-numeric type="tel" inputmode="numeric" pattern="\d*" autocomplete="off">
       </div>
 
       <div class="form-group">
         <label for="cut-quantity">Количество:</label>
-        <input id="cut-quantity" type="number" min="1" value="1">
+        <input id="cut-quantity"  min="1" value="1" data-numeric type="tel" inputmode="numeric" pattern="\d*" autocomplete="off">
       </div>
 
       <button id="add-cut">Добавить отрезки</button>
@@ -139,7 +165,7 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', ()=> {
-  // restore state
+  // ---------- state ----------
   let cuts = JSON.parse(localStorage.getItem('cuts')) || [];
   let completedStocks = JSON.parse(localStorage.getItem('completedStocks')) || [];
   const stockInput = document.getElementById('stock-length');
@@ -181,19 +207,95 @@ document.addEventListener('DOMContentLoaded', ()=> {
     });
   }
 
-  // packWithConstraint for minWaste constraint:
-  // - minWaste >= 0 (or 0/empty means no constraint)
-  // We need sum <= stock - minWaste (so leftover >= minWaste).
-  // Return { chosen, sum, impossible } where impossible==true if constraint can't be satisfied at all.
+  // ---------------- color helpers ----------------
+  function hashInt(x) {
+    let n = (x >>> 0);
+    n = (n ^ 61) ^ (n >>> 16);
+    n = n + (n << 3);
+    n = n ^ (n >>> 4);
+    n = (n * 0x27d4eb2d) >>> 0;
+    n = n ^ (n >>> 15);
+    return n >>> 0;
+  }
+  function hueFromLen(len) {
+    return hashInt(len) % 360;
+  }
+  function getColorForLength(len, opts = {}) {
+    const s = (opts.saturation !== undefined) ? opts.saturation : 65;
+    const l = (opts.lightness !== undefined) ? opts.lightness : 50;
+    const h = hueFromLen(len);
+    // modern HSL with spaces is supported in modern browsers; fallback comment included
+    return `hsl(${h} ${s}% ${l}%)`;
+    // return `hsl(${h}, ${s}%, ${l}%)`; // fallback older syntax
+  }
+
+  // group sizes if too many unique types
+  function maybeGroupSizes(sizes, maxDistinct = 18) {
+    if (sizes.length <= maxDistinct) return sizes.map(v => ({ label: String(v), min: v, max: v, sample: v }));
+    const min = Math.min(...sizes), max = Math.max(...sizes);
+    const buckets = [];
+    for (let i=0;i<maxDistinct;i++) buckets.push([]);
+    const range = max - min + 1;
+    sizes.forEach(v => {
+      const idx = Math.floor(((v - min) / range) * maxDistinct);
+      buckets[Math.min(idx, maxDistinct-1)].push(v);
+    });
+    const groups = buckets.filter(b=>b.length).map(b => {
+      const mn = Math.min(...b), mx = Math.max(...b);
+      const label = mn === mx ? `${mn}` : `${mn}–${mx}`;
+      return { label, min: mn, max: mx, sample: b[Math.floor(b.length/2)] };
+    });
+    return groups;
+  }
+
+  function renderLegendForResults(containerSelector, results) {
+    // collect counts
+    const counts = {};
+    results.forEach(stock => stock.pieces.forEach(len => counts[len] = (counts[len]||0)+1));
+    const unique = Object.keys(counts).map(x=>parseInt(x,10)).sort((a,b)=>b-a);
+    if (unique.length === 0) {
+      // remove old legend if present
+      const c = document.querySelector(containerSelector);
+      if (!c) return;
+      const old = c.querySelector('.legend');
+      if (old) old.remove();
+      return;
+    }
+    const groups = maybeGroupSizes(unique, 18);
+    const container = document.querySelector(containerSelector);
+    if (!container) return;
+    const old = container.querySelector('.legend');
+    if (old) old.remove();
+
+    const legend = document.createElement('div');
+    legend.className = 'legend';
+    groups.forEach(g => {
+      const sample = (g.sample !== undefined) ? g.sample : Math.round((g.min+g.max)/2);
+      const swatchColor = getColorForLength(sample);
+      const labelText = (g.min === g.max) ? `${g.min} мм` : `${g.label} мм`;
+      let totalCount = 0;
+      if (g.min === g.max) totalCount = counts[g.min] || 0;
+      else {
+        for (let k in counts) {
+          const v = parseInt(k,10);
+          if (v >= g.min && v <= g.max) totalCount += counts[k];
+        }
+      }
+      const item = document.createElement('div');
+      item.className = 'legend-item';
+      item.innerHTML = `<span class="legend-swatch" style="background:${swatchColor}"></span><span>${labelText}${totalCount?(' — '+totalCount+' шт') : ''}</span>`;
+      legend.appendChild(item);
+    });
+    container.appendChild(legend);
+  }
+
+  // ---------- packing utilities (minWaste variant) ----------
   function packWithConstraint_min(stock, freq, minWaste) {
-    // if minWaste not set or zero -> behave as no constraint (maximize fill)
     const hasConstraint = (typeof minWaste === 'number' && minWaste > 0);
     const upperCap = hasConstraint ? (stock - minWaste) : stock;
-    if (hasConstraint && upperCap < 0) {
-      return { chosen: [], sum: 0, impossible: true };
-    }
+    if (hasConstraint && upperCap < 0) return { chosen: [], sum: 0, impossible: true };
 
-    // build binary items
+    // build binary-decomposed items
     const items = [];
     for (const k of Object.keys(freq)) {
       const len = parseInt(k,10);
@@ -224,18 +326,14 @@ document.addEventListener('DOMContentLoaded', ()=> {
       }
     }
 
-    // If constraint exists, search for cap in [0..upperCap], prefer largest (closest to upperCap)
+    // when constraint: search cap <= upperCap, take largest such cap
     let best = -1;
     if (hasConstraint) {
       for (let cap = Math.min(upperCap, W); cap >= 0; cap--) {
         if (dp[cap]) { best = cap; break; }
       }
-      if (best === -1) {
-        // constraint impossible — nothing reachable with cap <= upperCap
-        return { chosen: [], sum: 0, impossible: true };
-      }
+      if (best === -1) return { chosen: [], sum: 0, impossible: true };
     } else {
-      // no constraint: find best cap in [0..W] maximizing fill
       for (let cap = W; cap >= 0; cap--) {
         if (dp[cap]) { best = cap; break; }
       }
@@ -263,93 +361,85 @@ document.addEventListener('DOMContentLoaded', ()=> {
     return { chosen, sum: sumChosen, impossible: false };
   }
 
-  // Greedy that tries packWithConstraint_min first (if constraint), otherwise fallback
-function greedyCut(stock, piecesIn, minWaste) {
-  // Если minWaste не задан или равен 0 — делаем ПУРИСТИЧЕСКИЙ жадный алгоритм:
-  // всегда берём самые длинные куски в первую очередь (largest-first).
-  if (!minWaste || minWaste <= 0) {
-    // копируем и сортируем по убыванию
-    const arr = [...piecesIn].sort((a,b) => b - a);
-    const results = [];
-    while (arr.length > 0) {
-      const current = { length: stock, pieces: [], remaining: stock };
-      // проходим по массиву и сразу удаляем вставленные элементы
-      for (let i = 0; i < arr.length; i++) {
-        if (arr[i] <= current.remaining) {
-          current.pieces.push(arr[i]);
-          current.remaining -= arr[i];
-          arr.splice(i, 1);
-          i--; // смещаем индекс после удаления
+  // ---------- greedy (strict largest-first if no minWaste) ----------
+  function greedyCut(stock, piecesIn, minWaste) {
+    if (!minWaste || minWaste <= 0) {
+      const arr = [...piecesIn].sort((a,b) => b - a);
+      const results = [];
+      while (arr.length > 0) {
+        const current = { length: stock, pieces: [], remaining: stock };
+        for (let i = 0; i < arr.length; i++) {
+          if (arr[i] <= current.remaining) {
+            current.pieces.push(arr[i]);
+            current.remaining -= arr[i];
+            arr.splice(i, 1);
+            i--;
+          }
         }
+        results.push(current);
       }
-      results.push(current);
+      return results;
     }
+
+    // if minWaste > 0: try packWithConstraint_min first, else fallback to greedy for remaining
+    const freq = {};
+    piecesIn.forEach(p => freq[p] = (freq[p]||0)+1);
+    const results = [];
+    let warned = false;
+
+    while (Object.keys(freq).length > 0) {
+      const pack = packWithConstraint_min(stock, freq, minWaste);
+      if (pack.impossible) {
+        if (!warned) {
+          showWarning(`Невозможно соблюсти минимальный остаток ${minWaste} мм для текущих кусков — используем жадную упаковку для оставшихся.`);
+          warned = true;
+        }
+        // fallback: pure greedy from remaining
+        const arr = [];
+        for (const k of Object.keys(freq)) {
+          const len = parseInt(k, 10);
+          for (let i = 0; i < freq[k]; i++) arr.push(len);
+        }
+        arr.sort((a,b)=>b-a);
+        const current = { length: stock, pieces: [], remaining: stock };
+        for (let i=0;i<arr.length;i++){
+          if (arr[i] <= current.remaining) {
+            current.pieces.push(arr[i]);
+            current.remaining -= arr[i];
+          }
+        }
+        current.pieces.forEach(len => {
+          freq[len]--;
+          if (freq[len] <= 0) delete freq[len];
+        });
+        results.push(current);
+        continue;
+      }
+
+      if (pack.chosen.length > 0) {
+        results.push({ length: stock, pieces: pack.chosen.slice(), remaining: stock - pack.sum });
+        const usedCounts = {};
+        pack.chosen.forEach(len => usedCounts[len] = (usedCounts[len]||0)+1);
+        for (const [lenStr, cnt] of Object.entries(usedCounts)) {
+          const len = parseInt(lenStr,10);
+          freq[len] -= cnt;
+          if (freq[len] <= 0) delete freq[len];
+        }
+        continue;
+      }
+
+      // last fallback: put largest single piece
+      const lens = Object.keys(freq).map(x => parseInt(x,10)).sort((a,b)=>b-a);
+      const biggest = lens[0];
+      results.push({ length: stock, pieces: [biggest], remaining: stock - biggest });
+      freq[biggest]--;
+      if (freq[biggest] <= 0) delete freq[biggest];
+    }
+
     return results;
   }
 
-  // Если minWaste > 0 — сначала пробуем packWithConstraint_min (встроенная функция),
-  // если она сообщает impossible — делаем жадную упаковку из оставшихся (largest-first).
-  const freq = {};
-  piecesIn.forEach(p => freq[p] = (freq[p] || 0) + 1);
-  const results = [];
-  let warned = false;
-
-  while (Object.keys(freq).length > 0) {
-    // пытаемся собрать комбинацию с суммой <= stock - minWaste
-    const pack = packWithConstraint_min(stock, freq, minWaste);
-    if (pack.impossible) {
-      if (!warned) {
-        showWarning(`Невозможно соблюсти минимальный остаток ${minWaste} мм для текущих кусков — используем жадную упаковку для оставшихся.`);
-        warned = true;
-      }
-      // fallback: сделаем чисто жадную упаковку из оставшихся элементов
-      const arr = [];
-      for (const k of Object.keys(freq)) {
-        const len = parseInt(k, 10);
-        for (let i = 0; i < freq[k]; i++) arr.push(len);
-      }
-      arr.sort((a,b) => b - a);
-      const current = { length: stock, pieces: [], remaining: stock };
-      for (let i = 0; i < arr.length; i++) {
-        if (arr[i] <= current.remaining) {
-          current.pieces.push(arr[i]);
-          current.remaining -= arr[i];
-        }
-      }
-      // удаляем использованные
-      current.pieces.forEach(len => {
-        freq[len]--;
-        if (freq[len] <= 0) delete freq[len];
-      });
-      results.push(current);
-      continue;
-    }
-
-    // pack.chosen — валидная комбинация, удовлетворяющая условию (или максимальная)
-    if (pack.chosen.length > 0) {
-      results.push({ length: stock, pieces: pack.chosen.slice(), remaining: stock - pack.sum });
-      const usedCounts = {};
-      pack.chosen.forEach(len => usedCounts[len] = (usedCounts[len] || 0) + 1);
-      for (const [lenStr, cnt] of Object.entries(usedCounts)) {
-        const len = parseInt(lenStr, 10);
-        freq[len] -= cnt;
-        if (freq[len] <= 0) delete freq[len];
-      }
-      continue;
-    }
-
-    // Если pack вернул пустую, но не impossible — положим самый большой кусок
-    const lens = Object.keys(freq).map(x => parseInt(x, 10)).sort((a,b) => b - a);
-    const biggest = lens[0];
-    results.push({ length: stock, pieces: [biggest], remaining: stock - biggest });
-    freq[biggest]--;
-    if (freq[biggest] <= 0) delete freq[biggest];
-  }
-
-  return results;
-}
-
-  // Optimized algorithm using packWithConstraint_min
+  // ---------- optimal using packWithConstraint_min loop ----------
   function optimalCut(stock, piecesIn, minWaste) {
     const freq = {};
     piecesIn.forEach(p => freq[p] = (freq[p]||0)+1);
@@ -363,8 +453,8 @@ function greedyCut(stock, piecesIn, minWaste) {
           showWarning(`Невозможно соблюсти минимальный остаток ${minWaste} мм для текущих кусков — будет выполнен расчёт без этого ограничения.`);
           warned = true;
         }
-        // fallback: best fill (maximize filled length) without constraint
-        const packNoConstraint = packWithConstraint_min(stock, freq, 0); // 0 == no constraint
+        // fallback: best fill without constraint
+        const packNoConstraint = packWithConstraint_min(stock, freq, 0);
         if (packNoConstraint.chosen.length > 0) {
           results.push({ length: stock, pieces: packNoConstraint.chosen.slice(), remaining: stock - packNoConstraint.sum });
           const usedCounts = {};
@@ -376,7 +466,6 @@ function greedyCut(stock, piecesIn, minWaste) {
           }
           continue;
         } else {
-          // Nothing packed, place biggest
           const lens = Object.keys(freq).map(x=>parseInt(x,10)).sort((a,b)=>b-a);
           const biggest = lens[0];
           results.push({ length: stock, pieces: [biggest], remaining: stock - biggest });
@@ -406,6 +495,7 @@ function greedyCut(stock, piecesIn, minWaste) {
     setTimeout(()=> { warningBox.style.display = 'none'; }, 8000);
   }
 
+  // ---------- display results (DOM build, not innerHTML for pieces) ----------
   function displayResults(results) {
     const container = document.getElementById('results-container');
     container.innerHTML = '';
@@ -414,23 +504,62 @@ function greedyCut(stock, piecesIn, minWaste) {
 
     results.forEach((stock, idx) => {
       totalWaste += stock.remaining;
-      const item = document.createElement('div');
-      item.className = 'result-item';
-      if (completedStocks.includes(idx)) item.classList.add('completed');
 
-      let piecesHtml = '';
-      stock.pieces.forEach(p => piecesHtml += `<div class="cut-piece">${p} мм</div>`);
-      if (stock.remaining > 0) piecesHtml += `<div class="cut-piece waste">Остаток: ${stock.remaining} мм</div>`;
+      const resultItem = document.createElement('div');
+      resultItem.className = 'result-item';
+      if (completedStocks.includes(idx)) resultItem.classList.add('completed');
 
-      item.innerHTML = `
-        <h3 class="stock-header">Заготовка #${idx+1}</h3>
-        <span class="completed-label">Выполнено</span>
-        <input type="checkbox" class="completed-checkbox" data-index="${idx}" ${completedStocks.includes(idx)?'checked':''} />
-        <div class="cut-pieces">${piecesHtml}</div>
-      `;
-      container.appendChild(item);
+      // header + checkbox
+      const header = document.createElement('h3');
+      header.className = 'stock-header';
+      header.textContent = `Заготовка #${idx+1}`;
+      resultItem.appendChild(header);
+
+      const completedLabel = document.createElement('span');
+      completedLabel.className = 'completed-label';
+      completedLabel.textContent = 'Выполнено';
+      resultItem.appendChild(completedLabel);
+
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.className = 'completed-checkbox';
+      checkbox.dataset.index = idx;
+      if (completedStocks.includes(idx)) checkbox.checked = true;
+      resultItem.appendChild(checkbox);
+
+      // pieces container
+      const piecesContainer = document.createElement('div');
+      piecesContainer.className = 'cut-pieces';
+      // add piece elements with colors based on length
+      stock.pieces.forEach(len => {
+        const pieceDiv = document.createElement('div');
+        pieceDiv.className = 'cut-piece';
+        pieceDiv.textContent = `${len} мм`;
+        // use deterministic color
+        pieceDiv.style.background = getColorForLength(len);
+        // if this stock is globally marked completed, mark piece green
+        if (completedStocks.includes(idx)) pieceDiv.classList.add('done');
+        // allow clicking on piece to toggle its individual done state
+        pieceDiv.style.cursor = 'pointer';
+        pieceDiv.addEventListener('click', () => {
+          pieceDiv.classList.toggle('done');
+        });
+        piecesContainer.appendChild(pieceDiv);
+      });
+
+      // add waste as last element (red)
+      if (stock.remaining > 0) {
+        const wasteDiv = document.createElement('div');
+        wasteDiv.className = 'cut-piece waste';
+        wasteDiv.textContent = `Остаток: ${stock.remaining} мм`;
+        piecesContainer.appendChild(wasteDiv);
+      }
+
+      resultItem.appendChild(piecesContainer);
+      container.appendChild(resultItem);
     });
 
+    // total info
     const info = document.createElement('div');
     info.className = 'total-info';
     const stockLen = parseInt(stockInput.value || 0,10) || 0;
@@ -442,6 +571,9 @@ function greedyCut(stock, piecesIn, minWaste) {
     `;
     container.appendChild(info);
 
+    // render legend based on results
+    renderLegendForResults('#results-container', results);
+
     // checkbox handlers
     container.querySelectorAll('.completed-checkbox').forEach(cb=>{
       cb.onchange = function() {
@@ -450,9 +582,12 @@ function greedyCut(stock, piecesIn, minWaste) {
         if (this.checked) {
           if (!completedStocks.includes(idx)) completedStocks.push(idx);
           parent.classList.add('completed');
+          // mark all piece divs inside as done
+          parent.querySelectorAll('.cut-piece').forEach(p => p.classList.add('done'));
         } else {
           completedStocks = completedStocks.filter(i => i !== idx);
           parent.classList.remove('completed');
+          parent.querySelectorAll('.cut-piece').forEach(p => p.classList.remove('done'));
         }
         updateProgress();
         saveState();
@@ -470,7 +605,7 @@ function greedyCut(stock, piecesIn, minWaste) {
     document.getElementById('progress-info').textContent = `Выполнено: ${done} из ${total} заготовок (${percent.toFixed(1)}%)`;
   }
 
-  // buttons
+  // ---------- UI buttons ----------
   document.getElementById('add-cut').onclick = () => {
     const len = parseInt(document.getElementById('cut-length').value,10);
     const qty = parseInt(document.getElementById('cut-quantity').value,10) || 1;
@@ -513,8 +648,8 @@ function greedyCut(stock, piecesIn, minWaste) {
 
   // init
   updateCutsList();
-  // optionally auto-calc on load if cuts exist:
-  // if (cuts.length>0) document.getElementById('calculate').click();
+  // optional: auto-calc on load if desired (commented out)
+  // if (cuts.length > 0) document.getElementById('calculate').click();
 });
 </script>
 </body>
